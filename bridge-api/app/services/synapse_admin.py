@@ -10,7 +10,6 @@ We use three endpoints:
 from __future__ import annotations
 
 import re
-import secrets
 
 import httpx
 from fastapi import HTTPException, status
@@ -55,13 +54,15 @@ class SynapseAdmin:
         avatar_url: str | None = None,
         deactivated: bool = False,
     ) -> str:
-        """Create or update a user. Returns the full Matrix ID."""
+        """Create or update a user. Returns the full Matrix ID.
+
+        We do NOT set a password — Synapse rejects password writes when
+        password_config.enabled is false. Login happens exclusively via
+        admin masquerade, so the password slot stays empty.
+        """
         user_id = self.matrix_id(localpart)
         url = f"{self._base}/_synapse/admin/v2/users/{user_id}"
         body: dict = {
-            # Random unguessable password — login is via admin masquerade,
-            # not via Matrix-native password flow.
-            "password": secrets.token_urlsafe(48),
             "deactivated": deactivated,
             "admin": False,
         }
