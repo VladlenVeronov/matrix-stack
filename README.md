@@ -5,20 +5,18 @@ Production-grade self-hosted Matrix/Synapse stack for **VIR.GROUP**.
 End-to-end encrypted chat, voice and video, replacing the previous
 Supabase-backed pseudo-messenger inside the Flutter app.
 
-## Status — Phase 1a (foundation)
+## Status — Phase 1b (foundation + bridge)
 
-This commit ships the **homeserver foundation only**:
-
-| Component       | Image                                  | Purpose                                |
+| Component       | Image / source                         | Purpose                                |
 | --------------- | -------------------------------------- | -------------------------------------- |
 | Synapse         | `matrixdotorg/synapse:v1.116.0`        | Matrix homeserver                      |
 | Postgres        | `postgres:16-alpine`                   | Synapse database (NOT Supabase)        |
 | Redis           | `redis:7-alpine`                       | replication / presence cache           |
 | Synapse-Admin   | `awesometechnologies/synapse-admin`    | web UI for moderation                  |
+| **bridge-api**  | `./bridge-api` (FastAPI)               | Supabase JWT → Matrix login + user sync|
 
 Following phases (separate commits):
 
-- **1b** — `bridge-api` (Supabase JWT → Matrix login, user provisioning)
 - **1c** — Sygnal (push gateway: FCM v1 + APNs)
 - **1d** — LiveKit + Element Call (group voice/video)
 - **1e** — `.well-known/matrix/*` static delegation files
@@ -92,6 +90,7 @@ To create the admin user (only the first time):
 4. **Domains** — map in Coolify:
    - `matrix.vir.group`        → service `synapse`,        port `8008`
    - `admin.matrix.vir.group`  → service `synapse-admin`,  port `80`
+   - `bridge.vir.group`        → service `bridge-api`,     port `8000`
 
 5. **Persistent storage** — three named volumes: `synapse-data`,
    `postgres-matrix-data`, `redis-matrix-data`.

@@ -110,3 +110,35 @@ services:
     ports:
       - "80"
     networks: [matrix-internal]
+
+  # -----------------------------------------------------------
+  # Bridge-API — Supabase JWT ↔ Matrix login + user sync
+  # -----------------------------------------------------------
+  bridge-api:
+    build:
+      context: ./bridge-api
+      dockerfile: Dockerfile
+    container_name: bridge-api
+    restart: unless-stopped
+    depends_on:
+      synapse:
+        condition: service_healthy
+    environment:
+      BRIDGE_PUBLIC_URL:           ${BRIDGE_PUBLIC_URL}
+      BRIDGE_LOG_LEVEL:            ${BRIDGE_LOG_LEVEL}
+      BRIDGE_SUPABASE_URL:         ${BRIDGE_SUPABASE_URL}
+      BRIDGE_SUPABASE_JWT_SECRET:  ${BRIDGE_SUPABASE_JWT_SECRET}
+      BRIDGE_SUPABASE_SERVICE_ROLE: ${BRIDGE_SUPABASE_SERVICE_ROLE}
+      BRIDGE_SYNAPSE_INTERNAL_URL: http://synapse:8008
+      BRIDGE_SYNAPSE_SERVER_NAME:  ${SYNAPSE_SERVER_NAME}
+      BRIDGE_SYNAPSE_ADMIN_TOKEN:  ${BRIDGE_SYNAPSE_ADMIN_TOKEN}
+      BRIDGE_WEBHOOK_SECRET:       ${BRIDGE_WEBHOOK_SECRET:-}
+    ports:
+      - "8000"
+    networks: [matrix-internal]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/v1/matrix/health',timeout=3).status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
