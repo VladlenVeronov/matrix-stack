@@ -196,6 +196,11 @@ services:
       - "7881:7881"          # TCP RTC fallback (NAT-restricted clients)
       - "7882-7999:7882-7999/udp"  # WebRTC media (<32768 → no ephemeral conflict)
     networks: [matrix-internal]
+    # LiveKit exposes 3 different ports; Traefik can't auto-pick the one to
+    # proxy, so we spell out 7880 (WebSocket signaling) explicitly.
+    labels:
+      - "traefik.http.services.https-0-q50663r5jw52lfmbv86vb4i6-livekit.loadbalancer.server.port=7880"
+      - "traefik.http.services.http-0-q50663r5jw52lfmbv86vb4i6-livekit.loadbalancer.server.port=7880"
     healthcheck:
       test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/7880"]
       interval: 30s
