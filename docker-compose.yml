@@ -167,3 +167,11 @@ services:
     ports:
       - "5000"
     networks: [matrix-internal]
+    healthcheck:
+      # Sygnal exposes only POST endpoints — no plain GET 200 path.
+      # We verify the TCP listener is up via netcat.
+      test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/5000"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
