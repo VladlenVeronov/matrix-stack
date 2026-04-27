@@ -19,6 +19,10 @@ class SupabaseClient:
             "apikey": settings.supabase_service_role,
             "Authorization": f"Bearer {settings.supabase_service_role}",
             "Content-Type": "application/json",
+            # Some Supabase projects default to a non-public schema (e.g. 'api');
+            # force public so we always hit public.users regardless of project config.
+            "Accept-Profile": "public",
+            "Content-Profile": "public",
         }
 
     async def get_user_profile(self, user_id: str) -> dict | None:
