@@ -1,0 +1,66 @@
+# =============================================================
+# Sygnal — Matrix push gateway config
+# Rendered from this template by sygnal/entrypoint.sh at boot.
+#
+# Synapse calls Sygnal at  http://sygnal:5000/_matrix/push/v1/notify
+# Sygnal forwards to:
+#   - FCM v1 → Android (and Web Push, when we add it)
+#   - APNs   → iOS
+#
+# Privacy: only event_id + room_id + sender are forwarded. The Megolm-
+# encrypted body never leaves the homeserver. The Flutter client wakes
+# up on push, then pulls the event from Synapse and decrypts locally.
+# =============================================================
+
+log:
+  setup:
+    version: 1
+    handlers:
+      stderr:
+        class: logging.StreamHandler
+        stream: ext://sys.stderr
+        formatter: normal
+    formatters:
+      normal:
+        format: '%(asctime)s [%(process)d] %(levelname)-8s %(name)s %(message)s'
+    loggers:
+      sygnal.access:
+        propagate: false
+        handlers: [stderr]
+        level: INFO
+    root:
+      level: INFO
+      handlers: [stderr]
+  access:
+    x_forwarded_for: true
+
+http:
+  bind_addresses: ['0.0.0.0']
+  port: 5000
+
+apps:
+
+  # -----------------------------------------------------------
+  # Android (FCM v1)
+  # -----------------------------------------------------------
+  ${SYGNAL_APNS_BUNDLE_ID}.android:
+    type: gcm
+    api_version: v1
+    project_id: "${SYGNAL_FCM_PROJECT_ID}"
+    service_account_file: "${SYGNAL_FCM_SERVICE_ACCOUNT_PATH}"
+    # E2EE-friendly: no message body in payload — only event_id + room_id
+    fcm_options:
+      content_available: true
+      mutable_content: true
+
+  # -----------------------------------------------------------
+  # iOS (APNs)
+  # -----------------------------------------------------------
+  ${SYGNAL_APNS_BUNDLE_ID}.ios:
+    type: apns
+    keyfile: "${SYGNAL_APNS_KEY_PATH}"
+    key_id: "${SYGNAL_APNS_KEY_ID}"
+    team_id: "${SYGNAL_APNS_TEAM_ID}"
+    topic: "${SYGNAL_APNS_BUNDLE_ID}"
+    platform: production
+    push_type: alert

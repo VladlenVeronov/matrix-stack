@@ -1,7 +1,7 @@
 # =============================================================
 # matrix-stack — production compose for Coolify
-# Phase 1a: Synapse + Postgres + Redis + Synapse-Admin
-# Bridge-API, Sygnal, LiveKit, Element Call land in later phases.
+# Phase 1c: Synapse + Postgres + Redis + Admin + bridge-api + Sygnal
+# LiveKit + Element Call land in Phase 1d.
 # =============================================================
 
 networks:
@@ -139,6 +139,37 @@ services:
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/v1/matrix/health',timeout=3).status==200 else 1)"]
       interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # -----------------------------------------------------------
+  # Sygnal — push gateway (FCM v1 + APNs)
+  # Forwards pushes from Synapse to Google / Apple. Privacy-first:
+  # only event_id + room_id reach FCM/APNs (E2EE body stays on server).
+  # Secrets are bind-mounted from /data/matrix-stack-secrets on the host.
+  # -----------------------------------------------------------
+  sygnal:
+    build:
+      context: ./sygnal
+      dockerfile: Dockerfile
+    container_name: sygnal
+    restart: unless-stopped
+    environment:
+      SYGNAL_FCM_PROJECT_ID:           ${SYGNAL_FCM_PROJECT_ID}
+      SYGNAL_FCM_SERVICE_ACCOUNT_PATH: ${SYGNAL_FCM_SERVICE_ACCOUNT_PATH}
+      SYGNAL_APNS_KEY_PATH:            ${SYGNAL_APNS_KEY_PATH}
+      SYGNAL_APNS_KEY_ID:              ${SYGNAL_APNS_KEY_ID}
+      SYGNAL_APNS_TEAM_ID:             ${SYGNAL_APNS_TEAM_ID}
+      SYGNAL_APNS_BUNDLE_ID:           ${SYGNAL_APNS_BUNDLE_ID}
+    volumes:
+      - /data/matrix-stack-secrets:/secrets:ro
+    ports:
+      - "5000"
+    networks: [matrix-internal]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:5000/_matrix/push/v1/notify"]
+      interval: 30s
       timeout: 5s
       retries: 5
       start_period: 30s
