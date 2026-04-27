@@ -1,16 +1,16 @@
-"""POST /v1/matrix/users/sync — webhook from Supabase.
+"""User-related endpoints:
 
-Triggered by a `users` table AFTER UPDATE / AFTER DELETE database
-trigger. The webhook keeps the Matrix profile in step with Supabase
-without requiring the user to log into the app.
+  POST /v1/matrix/users/sync     webhook from Supabase trigger
+  GET  /v1/matrix/users/search   invite picker autocomplete (public)
 """
 from __future__ import annotations
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from app.deps import get_synapse, require_webhook_secret
+from app.deps import get_supabase, get_synapse, require_webhook_secret
+from app.services.supabase_client import SupabaseClient
 from app.services.synapse_admin import SynapseAdmin, make_localpart
 
 router = APIRouter()
@@ -48,3 +48,24 @@ async def users_sync(
         return {"status": "updated", "matrix_user_id": matrix_user_id}
 
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="unknown_type")
+
+
+@router.get("/users/search")
+async def users_search(
+    q: str = Query(..., min_length=2, max_length=64),
+    limit: int = Query(10, ge=1, le=30),
+    supa: SupabaseClient = Depends(get_supabase),
+) -> list[dict]:
+    """Public invite-picker autocomplete.
+
+    Returns at most `limit` users whose username or email contains `q`
+    AND who have already been provisioned in Matrix (matrix_user_id IS
+    NOT NULL). The endpoint does not require auth — it leaks only
+    public-by-design fields (username, display_name, avatar_url).
+    """
+    try:
+        rows = await supa.search_users(q, limit=limit)
+    except Exception as exc:  # pragma: no cover
+        log.exception("users_search_failed", error=str(exc))
+        return []
+    return rows

@@ -34,6 +34,24 @@ class SupabaseClient:
         rows = r.json()
         return rows[0] if rows else None
 
+    async def search_users(self, query: str, limit: int = 10) -> list[dict]:
+        """Username/display-name fuzzy search for the invite picker.
+
+        Looks up rows in public.users where username OR email contains
+        the query (case-insensitive). Only returns rows that have a
+        matrix_user_id — otherwise the row can't be invited yet.
+        """
+        url = f"{self._url}/rest/v1/users"
+        params = {
+            "select": "username,display_name,avatar_url,matrix_user_id",
+            "or": f"(username.ilike.%{query}%,email.ilike.%{query}%)",
+            "matrix_user_id": "not.is.null",
+            "limit": str(limit),
+        }
+        r = await self._client.get(url, params=params, headers=self._headers)
+        r.raise_for_status()
+        return list(r.json())
+
     async def patch_user_matrix_fields(
         self,
         user_id: str,
