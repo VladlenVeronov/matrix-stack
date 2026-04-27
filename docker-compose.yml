@@ -1,7 +1,6 @@
 # =============================================================
 # matrix-stack — production compose for Coolify
-# Phase 1c: Synapse + Postgres + Redis + Admin + bridge-api + Sygnal
-# LiveKit + Element Call land in Phase 1d.
+# Phase 1d: Synapse + Postgres + Redis + Admin + bridge-api + Sygnal + LiveKit
 # =============================================================
 
 networks:
@@ -171,6 +170,32 @@ services:
       # Sygnal exposes only POST endpoints — no plain GET 200 path.
       # We verify the TCP listener is up via netcat.
       test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/5000"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # -----------------------------------------------------------
+  # LiveKit — SFU for group voice/video calls (Element Call)
+  # Requires DNS-only A record: livekit.matrix.vir.group → 168.231.108.21
+  # AND host-network UDP ports 50000-60000 + TCP 7880/7881 open in firewall.
+  # -----------------------------------------------------------
+  livekit:
+    build:
+      context: ./livekit
+      dockerfile: Dockerfile
+    container_name: livekit
+    restart: unless-stopped
+    environment:
+      LIVEKIT_API_KEY:    ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+    ports:
+      - "7880:7880"     # WebSocket signaling (Caddy proxies wss://)
+      - "7881:7881"     # TCP RTC fallback
+      - "50000-60000:50000-60000/udp"  # WebRTC media
+    networks: [matrix-internal]
+    healthcheck:
+      test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/7880"]
       interval: 30s
       timeout: 5s
       retries: 5
