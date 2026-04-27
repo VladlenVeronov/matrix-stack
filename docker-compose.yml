@@ -176,9 +176,11 @@ services:
       start_period: 30s
 
   # -----------------------------------------------------------
-  # LiveKit — SFU for group voice/video calls (Element Call)
-  # Requires DNS-only A record: livekit.matrix.vir.group → 168.231.108.21
-  # AND host-network UDP ports 50000-60000 + TCP 7880/7881 open in firewall.
+  # LiveKit — SFU for group voice/video calls (Element Call).
+  # Uses host networking — required for WebRTC because docker-proxy
+  # struggles with thousands of UDP ports and conflicts with the
+  # kernel's ephemeral range (32768-60999). With host network the
+  # container binds 7880/tcp + 7881/tcp + 50000-60000/udp directly.
   # -----------------------------------------------------------
   livekit:
     build:
@@ -186,14 +188,10 @@ services:
       dockerfile: Dockerfile
     container_name: livekit
     restart: unless-stopped
+    network_mode: host
     environment:
       LIVEKIT_API_KEY:    ${LIVEKIT_API_KEY}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
-    ports:
-      - "7880:7880"     # WebSocket signaling (Caddy proxies wss://)
-      - "7881:7881"     # TCP RTC fallback
-      - "50000-60000:50000-60000/udp"  # WebRTC media
-    networks: [matrix-internal]
     healthcheck:
       test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/7880"]
       interval: 30s
