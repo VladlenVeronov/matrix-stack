@@ -198,7 +198,10 @@ services:
     networks: [matrix-internal]
     # LiveKit exposes 3 different ports; Traefik can't auto-pick the one to
     # proxy, so we spell out 7880 (WebSocket signaling) explicitly.
+    # The container has two networks (default + matrix-internal); pin Traefik
+    # to use the project network it shares with the proxy.
     labels:
+      - "traefik.docker.network=q50663r5jw52lfmbv86vb4i6"
       - "traefik.http.services.https-0-q50663r5jw52lfmbv86vb4i6-livekit.loadbalancer.server.port=7880"
       - "traefik.http.services.http-0-q50663r5jw52lfmbv86vb4i6-livekit.loadbalancer.server.port=7880"
     healthcheck:
