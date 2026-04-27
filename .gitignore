@@ -1,0 +1,36 @@
+# Local env / secrets
+.env
+.env.local
+.env.*.local
+secrets/
+*.p8
+*.pem
+*.key
+
+# Synapse runtime data — generated locally during dev
+data/
+synapse/signing.key
+synapse/*.signing.key
+
+# Generated config
+synapse/homeserver.yaml
+sygnal/sygnal.yaml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Docker
+docker-compose.override.yml

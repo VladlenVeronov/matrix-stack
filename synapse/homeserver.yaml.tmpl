@@ -1,0 +1,141 @@
+# =============================================================
+# Synapse homeserver config — template for envsubst
+# Rendered to /data/homeserver.yaml at container start.
+# =============================================================
+
+server_name: "${SYNAPSE_SERVER_NAME}"
+public_baseurl: "${SYNAPSE_PUBLIC_BASEURL}"
+serve_server_wellknown: true
+report_stats: ${SYNAPSE_REPORT_STATS}
+pid_file: /data/homeserver.pid
+
+# -------------------------------------------------------------
+# Listeners
+# -------------------------------------------------------------
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ['0.0.0.0']
+    resources:
+      - names: [client, federation]
+        compress: false
+
+# -------------------------------------------------------------
+# Database (Postgres dedicated to Synapse)
+# -------------------------------------------------------------
+database:
+  name: psycopg2
+  args:
+    user: "${MATRIX_PG_USER}"
+    password: "${MATRIX_PG_PASSWORD}"
+    database: "${MATRIX_PG_DB}"
+    host: "${MATRIX_PG_HOST}"
+    port: ${MATRIX_PG_PORT}
+    cp_min: 5
+    cp_max: 10
+
+# -------------------------------------------------------------
+# Redis (replication + presence)
+# -------------------------------------------------------------
+redis:
+  enabled: true
+  host: redis-matrix
+  port: 6379
+  password: "${MATRIX_REDIS_PASSWORD}"
+
+# -------------------------------------------------------------
+# Logging
+# -------------------------------------------------------------
+log_config: "/data/log.config"
+
+# -------------------------------------------------------------
+# Media storage (local — switch to S3 later via media_storage_providers)
+# -------------------------------------------------------------
+media_store_path: /data/media_store
+uploads_path: /data/uploads
+max_upload_size: ${SYNAPSE_MAX_UPLOAD_SIZE_MB}M
+max_image_pixels: 32M
+dynamic_thumbnails: true
+url_preview_enabled: true
+url_preview_ip_range_blacklist:
+  - '127.0.0.0/8'
+  - '10.0.0.0/8'
+  - '172.16.0.0/12'
+  - '192.168.0.0/16'
+  - '100.64.0.0/10'
+  - '169.254.0.0/16'
+  - '::1/128'
+  - 'fe80::/10'
+  - 'fc00::/7'
+
+# -------------------------------------------------------------
+# Registration & login policy
+# -------------------------------------------------------------
+enable_registration: ${SYNAPSE_ENABLE_REGISTRATION}
+enable_registration_without_verification: false
+registration_shared_secret: "${SYNAPSE_REGISTRATION_SHARED_SECRET}"
+allow_guest_access: ${SYNAPSE_ALLOW_GUEST_ACCESS}
+
+password_config:
+  enabled: ${SYNAPSE_PASSWORD_LOGIN_ENABLED}
+
+# -------------------------------------------------------------
+# Federation — disabled (closed ecosystem)
+# -------------------------------------------------------------
+federation_domain_whitelist: []
+allow_public_rooms_over_federation: false
+allow_public_rooms_without_auth: false
+
+# -------------------------------------------------------------
+# E2EE
+# -------------------------------------------------------------
+encryption_enabled_by_default_for_room_type: all
+
+# -------------------------------------------------------------
+# Secrets
+# -------------------------------------------------------------
+macaroon_secret_key: "${SYNAPSE_MACAROON_SECRET_KEY}"
+form_secret: "${SYNAPSE_FORM_SECRET}"
+
+signing_key_path: "/data/signing.key"
+
+# -------------------------------------------------------------
+# Trusted key servers — empty when federation is off
+# -------------------------------------------------------------
+trusted_key_servers: []
+suppress_key_server_warning: true
+
+# -------------------------------------------------------------
+# Rate limits — generous defaults; tune with real traffic
+# -------------------------------------------------------------
+rc_message:
+  per_second: 5
+  burst_count: 20
+rc_login:
+  address:
+    per_second: 0.5
+    burst_count: 10
+
+# -------------------------------------------------------------
+# Retention / GDPR
+# -------------------------------------------------------------
+retention:
+  enabled: true
+  default_policy:
+    min_lifetime: 1d
+    max_lifetime: 5y
+
+# -------------------------------------------------------------
+# Auto-join rooms (none by default — bridge handles invites)
+# -------------------------------------------------------------
+auto_join_rooms: []
+
+# -------------------------------------------------------------
+# Experimental — turn ON for Phase 4 features
+# -------------------------------------------------------------
+experimental_features:
+  msc3026_enabled: true   # busy presence
+  msc3266_enabled: true   # room summary API (used by client previews)
+  msc3873_escape_invalid_pl_chars: true

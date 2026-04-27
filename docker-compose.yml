@@ -1,0 +1,112 @@
+# =============================================================
+# matrix-stack — production compose for Coolify
+# Phase 1a: Synapse + Postgres + Redis + Synapse-Admin
+# Bridge-API, Sygnal, LiveKit, Element Call land in later phases.
+# =============================================================
+
+networks:
+  matrix-internal:
+    driver: bridge
+
+volumes:
+  synapse-data:
+  postgres-matrix-data:
+  redis-matrix-data:
+
+services:
+
+  # -----------------------------------------------------------
+  # Postgres — dedicated to Synapse (NOT the Supabase one)
+  # -----------------------------------------------------------
+  postgres-matrix:
+    image: postgres:16-alpine
+    container_name: postgres-matrix
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${MATRIX_PG_USER}
+      POSTGRES_PASSWORD: ${MATRIX_PG_PASSWORD}
+      POSTGRES_DB: ${MATRIX_PG_DB}
+      # Synapse requires C locale for collation
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres-matrix-data:/var/lib/postgresql/data
+    networks: [matrix-internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MATRIX_PG_USER} -d ${MATRIX_PG_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # -----------------------------------------------------------
+  # Redis — replication / presence / caching
+  # -----------------------------------------------------------
+  redis-matrix:
+    image: redis:7-alpine
+    container_name: redis-matrix
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${MATRIX_REDIS_PASSWORD}", "--save", "60", "1000"]
+    volumes:
+      - redis-matrix-data:/data
+    networks: [matrix-internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${MATRIX_REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # -----------------------------------------------------------
+  # Synapse — Matrix homeserver
+  # -----------------------------------------------------------
+  synapse:
+    build:
+      context: ./synapse
+      dockerfile: Dockerfile
+    container_name: synapse
+    restart: unless-stopped
+    depends_on:
+      postgres-matrix:
+        condition: service_healthy
+      redis-matrix:
+        condition: service_healthy
+    environment:
+      SYNAPSE_SERVER_NAME: ${SYNAPSE_SERVER_NAME}
+      SYNAPSE_PUBLIC_BASEURL: ${SYNAPSE_PUBLIC_BASEURL}
+      SYNAPSE_REPORT_STATS: ${SYNAPSE_REPORT_STATS}
+      SYNAPSE_ENABLE_REGISTRATION: ${SYNAPSE_ENABLE_REGISTRATION}
+      SYNAPSE_ALLOW_GUEST_ACCESS: ${SYNAPSE_ALLOW_GUEST_ACCESS}
+      SYNAPSE_PASSWORD_LOGIN_ENABLED: ${SYNAPSE_PASSWORD_LOGIN_ENABLED}
+      SYNAPSE_REGISTRATION_SHARED_SECRET: ${SYNAPSE_REGISTRATION_SHARED_SECRET}
+      SYNAPSE_MACAROON_SECRET_KEY: ${SYNAPSE_MACAROON_SECRET_KEY}
+      SYNAPSE_FORM_SECRET: ${SYNAPSE_FORM_SECRET}
+      SYNAPSE_MAX_UPLOAD_SIZE_MB: ${SYNAPSE_MAX_UPLOAD_SIZE_MB}
+      MATRIX_PG_HOST: ${MATRIX_PG_HOST}
+      MATRIX_PG_PORT: ${MATRIX_PG_PORT}
+      MATRIX_PG_USER: ${MATRIX_PG_USER}
+      MATRIX_PG_PASSWORD: ${MATRIX_PG_PASSWORD}
+      MATRIX_PG_DB: ${MATRIX_PG_DB}
+      MATRIX_REDIS_PASSWORD: ${MATRIX_REDIS_PASSWORD}
+    volumes:
+      - synapse-data:/data
+    ports:
+      # exposed only inside Coolify network — Caddy proxies 8008
+      - "8008"
+    networks: [matrix-internal]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8008/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # -----------------------------------------------------------
+  # Synapse-Admin — web UI for moderation / user management
+  # -----------------------------------------------------------
+  synapse-admin:
+    image: awesometechnologies/synapse-admin:0.10.3
+    container_name: synapse-admin
+    restart: unless-stopped
+    environment:
+      REACT_APP_SERVER: ${SYNAPSE_PUBLIC_BASEURL}
+    ports:
+      - "80"
+    networks: [matrix-internal]
