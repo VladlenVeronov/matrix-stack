@@ -1,11 +1,10 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Sygnal entrypoint — renders config from envsubst template.
-set -eu
+set -euo pipefail
 
-CFG=/data/sygnal.yaml
+CFG=/tmp/sygnal.yaml
 TMPL=/etc/sygnal/sygnal.yaml.tmpl
 
-mkdir -p /data
 echo "[sygnal-entrypoint] rendering ${CFG}…"
 envsubst < "${TMPL}" > "${CFG}"
 
