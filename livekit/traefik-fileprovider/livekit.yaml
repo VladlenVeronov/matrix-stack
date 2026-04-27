@@ -1,0 +1,45 @@
+# Traefik file-provider override for livekit.matrix.vir.group.
+#
+# Coolify's docker-provider auto-discovery silently fails for the LiveKit
+# container — even with the correct labels (router + service + port +
+# tls.certresolver), Traefik's runtime never registers the route, so all
+# external requests return 503 and ACME never triggers.
+#
+# Workaround: drop this file at /data/coolify/proxy/dynamic/livekit.yaml
+# on the host. Traefik watches that directory (--providers.file.watch=true),
+# so the route appears immediately without restarting anything.
+#
+# The IP `10.0.3.3` is LiveKit's address on the project's default Docker
+# network. Verify after every redeploy with:
+#
+#   docker inspect $(docker ps --format '{{.Names}}' | grep '^livekit-q50' | head -1) \
+#     --format '{{(index .NetworkSettings.Networks "q50663r5jw52lfmbv86vb4i6").IPAddress}}'
+#
+# If the IP changes, edit this file accordingly. (TODO: replace with a DNS
+# alias in a follow-up so we don't have to track the IP.)
+
+http:
+  routers:
+    livekit-https:
+      entryPoints: [https]
+      rule: "Host(`livekit.matrix.vir.group`)"
+      service: livekit-svc
+      tls:
+        certResolver: letsencrypt
+    livekit-http:
+      entryPoints: [http]
+      rule: "Host(`livekit.matrix.vir.group`)"
+      service: livekit-svc
+      middlewares: [livekit-redirect-https]
+
+  middlewares:
+    livekit-redirect-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+  services:
+    livekit-svc:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.3.3:7880"
