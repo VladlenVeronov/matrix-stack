@@ -8,9 +8,11 @@ bind_addresses:
   - "0.0.0.0"
 
 rtc:
-  # UDP port range for media (50000–60000)
-  port_range_start: 50000
-  port_range_end: 60000
+  # UDP port range for media — kept BELOW Linux's ephemeral range
+  # (32768–60999) to avoid conflicts with outbound connections.
+  # 7882–7999 = 118 simultaneous WebRTC peers; raise if needed.
+  port_range_start: 7882
+  port_range_end: 7999
   # TCP fallback for restrictive NATs
   tcp_port: 7881
   # External IP must be the public host (server's WAN address)
