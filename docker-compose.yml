@@ -145,31 +145,25 @@ services:
 
   # -----------------------------------------------------------
   # Sygnal — push gateway (FCM v1 + APNs)
-  # Forwards pushes from Synapse to Google / Apple. Privacy-first:
-  # only event_id + room_id reach FCM/APNs (E2EE body stays on server).
-  # Secrets are bind-mounted from /data/matrix-stack-secrets on the host.
+  # Temporarily commented out — pip package name needs verification.
+  # Re-enabled in a follow-up commit once correct PyPI package + version
+  # is confirmed. Secrets already in place at /data/matrix-stack-secrets.
   # -----------------------------------------------------------
-  sygnal:
-    build:
-      context: ./sygnal
-      dockerfile: Dockerfile
-    container_name: sygnal
-    restart: unless-stopped
-    environment:
-      SYGNAL_FCM_PROJECT_ID:           ${SYGNAL_FCM_PROJECT_ID}
-      SYGNAL_FCM_SERVICE_ACCOUNT_PATH: ${SYGNAL_FCM_SERVICE_ACCOUNT_PATH}
-      SYGNAL_APNS_KEY_PATH:            ${SYGNAL_APNS_KEY_PATH}
-      SYGNAL_APNS_KEY_ID:              ${SYGNAL_APNS_KEY_ID}
-      SYGNAL_APNS_TEAM_ID:             ${SYGNAL_APNS_TEAM_ID}
-      SYGNAL_APNS_BUNDLE_ID:           ${SYGNAL_APNS_BUNDLE_ID}
-    volumes:
-      - /data/matrix-stack-secrets:/secrets:ro
-    ports:
-      - "5000"
-    networks: [matrix-internal]
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:5000/_matrix/push/v1/notify"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+  # sygnal:
+  #   build:
+  #     context: ./sygnal
+  #     dockerfile: Dockerfile
+  #   container_name: sygnal
+  #   restart: unless-stopped
+  #   environment:
+  #     SYGNAL_FCM_PROJECT_ID:           ${SYGNAL_FCM_PROJECT_ID}
+  #     SYGNAL_FCM_SERVICE_ACCOUNT_PATH: ${SYGNAL_FCM_SERVICE_ACCOUNT_PATH}
+  #     SYGNAL_APNS_KEY_PATH:            ${SYGNAL_APNS_KEY_PATH}
+  #     SYGNAL_APNS_KEY_ID:              ${SYGNAL_APNS_KEY_ID}
+  #     SYGNAL_APNS_TEAM_ID:             ${SYGNAL_APNS_TEAM_ID}
+  #     SYGNAL_APNS_BUNDLE_ID:           ${SYGNAL_APNS_BUNDLE_ID}
+  #   volumes:
+  #     - /data/matrix-stack-secrets:/secrets:ro
+  #   ports:
+  #     - "5000"
+  #   networks: [matrix-internal]
