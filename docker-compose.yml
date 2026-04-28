@@ -90,6 +90,9 @@ services:
       # exposed only inside Coolify network — Caddy proxies 8008
       - "8008"
     networks: [matrix-internal]
+    labels:
+      - "traefik.docker.network=q50663r5jw52lfmbv86vb4i6"
+      - "traefik.http.services.https-0-q50663r5jw52lfmbv86vb4i6-synapse.loadbalancer.server.port=8008"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8008/health"]
       interval: 15s
@@ -109,6 +112,9 @@ services:
     ports:
       - "80"
     networks: [matrix-internal]
+    labels:
+      - "traefik.docker.network=q50663r5jw52lfmbv86vb4i6"
+      - "traefik.http.services.https-0-q50663r5jw52lfmbv86vb4i6-synapse-admin.loadbalancer.server.port=80"
 
   # -----------------------------------------------------------
   # Bridge-API — Supabase JWT ↔ Matrix login + user sync
@@ -135,6 +141,9 @@ services:
     ports:
       - "8000"
     networks: [matrix-internal]
+    labels:
+      - "traefik.docker.network=q50663r5jw52lfmbv86vb4i6"
+      - "traefik.http.services.https-0-q50663r5jw52lfmbv86vb4i6-bridge-api.loadbalancer.server.port=8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/v1/matrix/health',timeout=3).status==200 else 1)"]
       interval: 15s
@@ -166,6 +175,9 @@ services:
     ports:
       - "5000"
     networks: [matrix-internal]
+    labels:
+      - "traefik.docker.network=q50663r5jw52lfmbv86vb4i6"
+      - "traefik.http.services.https-0-q50663r5jw52lfmbv86vb4i6-sygnal.loadbalancer.server.port=5000"
     healthcheck:
       # Sygnal exposes only POST endpoints — no plain GET 200 path.
       # We verify the TCP listener is up via netcat.
