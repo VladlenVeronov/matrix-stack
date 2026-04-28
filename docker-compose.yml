@@ -180,8 +180,8 @@ services:
       - "traefik.http.services.https-0-q50663r5jw52lfmbv86vb4i6-sygnal.loadbalancer.server.port=5000"
     healthcheck:
       # Sygnal exposes only POST endpoints — no plain GET 200 path.
-      # We verify the TCP listener is up via netcat.
-      test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/5000"]
+      # /bin/sh is dash and doesn't have /dev/tcp; use bash explicitly.
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/5000"]
       interval: 30s
       timeout: 5s
       retries: 5
