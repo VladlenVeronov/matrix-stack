@@ -94,6 +94,18 @@ allow_public_rooms_without_auth: false
 encryption_enabled_by_default_for_room_type: all
 
 # -------------------------------------------------------------
+# VoIP / TURN — for 1:1 mesh calls (flutter_webrtc).
+# Synapse mints time-limited TURN credentials via HMAC of the
+# shared secret; coturn validates them with the same secret.
+# -------------------------------------------------------------
+turn_uris:
+  - "turn:${COTURN_REALM}?transport=udp"
+  - "turn:${COTURN_REALM}?transport=tcp"
+turn_shared_secret: "${COTURN_STATIC_AUTH_SECRET}"
+turn_user_lifetime: 86400000
+turn_allow_guests: false
+
+# -------------------------------------------------------------
 # Secrets
 # -------------------------------------------------------------
 macaroon_secret_key: "${SYNAPSE_MACAROON_SECRET_KEY}"

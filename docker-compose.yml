@@ -84,6 +84,8 @@ services:
       MATRIX_PG_PASSWORD: ${MATRIX_PG_PASSWORD}
       MATRIX_PG_DB: ${MATRIX_PG_DB}
       MATRIX_REDIS_PASSWORD: ${MATRIX_REDIS_PASSWORD}
+      COTURN_REALM: ${COTURN_REALM}
+      COTURN_STATIC_AUTH_SECRET: ${COTURN_STATIC_AUTH_SECRET}
     volumes:
       - synapse-data:/data
     ports:
@@ -222,3 +224,30 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # -----------------------------------------------------------
+  # coturn — TURN/STUN for Matrix 1:1 mesh calls (flutter_webrtc).
+  # Host networking is the only sane option: coturn needs to bind
+  # the relay UDP range plus advertise the host's public IP, which
+  # docker-proxy mangles. Ports must be opened in UFW separately:
+  #   3478/udp, 3478/tcp, 49152-49200/udp.
+  # Auth: REST API time-limited credentials shared with Synapse via
+  # COTURN_STATIC_AUTH_SECRET (== synapse turn_shared_secret).
+  # -----------------------------------------------------------
+  coturn:
+    build:
+      context: ./coturn
+      dockerfile: Dockerfile
+    container_name: coturn
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      COTURN_REALM:              ${COTURN_REALM}
+      COTURN_EXTERNAL_IP:        ${COTURN_EXTERNAL_IP}
+      COTURN_STATIC_AUTH_SECRET: ${COTURN_STATIC_AUTH_SECRET}
+    healthcheck:
+      test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/3478"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s

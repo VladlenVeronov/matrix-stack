@@ -1,0 +1,49 @@
+# =============================================================
+# coturn — TURN/STUN for Matrix 1:1 voice/video calls
+# Rendered from template at container boot.
+#
+# Auth model: REST API time-limited credentials. Synapse mints
+# username:password tuples via HMAC-SHA1(static_auth_secret, ts:userId)
+# and serves them via /voip/turnServer; coturn validates them with
+# the same shared secret. Clients never see the raw secret.
+# =============================================================
+
+# Listening / relay
+listening-port=3478
+listening-ip=0.0.0.0
+external-ip=${COTURN_EXTERNAL_IP}
+relay-ip=${COTURN_EXTERNAL_IP}
+realm=${COTURN_REALM}
+
+# Narrow relay range — 50 ports = ~25 simultaneous calls. Expand
+# later if call volume grows. Must be opened in UFW too.
+min-port=49152
+max-port=49200
+
+# REST-API auth (matches Synapse turn_shared_secret)
+use-auth-secret
+static-auth-secret=${COTURN_STATIC_AUTH_SECRET}
+
+# Hardening
+no-multicast-peers
+no-cli
+no-tlsv1
+no-tlsv1_1
+fingerprint
+stale-nonce=600
+total-quota=100
+user-quota=12
+
+# Refuse to relay to private ranges — prevents amplification &
+# accidental SSRF into the internal docker networks.
+no-loopback-peers
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+denied-peer-ip=169.254.0.0-169.254.255.255
+denied-peer-ip=127.0.0.0-127.255.255.255
+denied-peer-ip=100.64.0.0-100.127.255.255
+
+# Logging
+log-file=stdout
+verbose
