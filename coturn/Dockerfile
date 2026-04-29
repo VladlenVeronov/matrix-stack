@@ -11,7 +11,7 @@ COPY turnserver.conf.tmpl /etc/coturn/turnserver.conf.tmpl
 COPY entrypoint.sh        /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Run as the non-root coturn user baked into the upstream image.
-USER coturn
-
+# Run as root: 3478 is a privileged port, and the upstream image
+# doesn't ship a non-root user we can fall back to. We're sandboxed
+# in a container with no caps beyond what coturn needs anyway.
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
