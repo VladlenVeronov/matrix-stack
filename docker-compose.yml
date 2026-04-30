@@ -1,11 +1,18 @@
 # =============================================================
-# matrix-stack — production compose for Coolify
-# Phase 1d: Synapse + Postgres + Redis + Admin + bridge-api + Sygnal + LiveKit
+# matrix-stack — production compose for Hetzner (vir-hel)
+# Deployed under /home/vir/stacks/matrix-stack/ alongside other
+# vir.group services. Traefik runs in /home/vir/stacks/traefik
+# with provider=docker on the external `traefik-public` network.
+#
+# Stack: Synapse + Postgres + Redis + Synapse-Admin + bridge-api
+#        + Sygnal (FCM/APNs) + LiveKit (group SFU) + coturn (TURN/STUN)
 # =============================================================
 
 networks:
   matrix-internal:
     driver: bridge
+  traefik-public:
+    external: true
 
 volumes:
   synapse-data:
@@ -25,7 +32,6 @@ services:
       POSTGRES_USER: ${MATRIX_PG_USER}
       POSTGRES_PASSWORD: ${MATRIX_PG_PASSWORD}
       POSTGRES_DB: ${MATRIX_PG_DB}
-      # Synapse requires C locale for collation
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     volumes:
       - postgres-matrix-data:/var/lib/postgresql/data
@@ -88,13 +94,27 @@ services:
       COTURN_STATIC_AUTH_SECRET: ${COTURN_STATIC_AUTH_SECRET}
     volumes:
       - synapse-data:/data
-    ports:
-      # exposed only inside Coolify network — Caddy proxies 8008
+    networks: [matrix-internal, traefik-public]
+    expose:
       - "8008"
-    networks: [matrix-internal]
     labels:
-      - "traefik.docker.network=q50663r5jw52lfmbv86vb4i6"
-      - "traefik.http.services.https-0-q50663r5jw52lfmbv86vb4i6-synapse.loadbalancer.server.port=8008"
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      # HTTPS — main Synapse client API
+      - traefik.http.routers.synapse.entrypoints=https
+      - traefik.http.routers.synapse.rule=Host(`matrix.vir.group`)
+      - traefik.http.routers.synapse.priority=50
+      - traefik.http.routers.synapse.tls=true
+      - traefik.http.routers.synapse.tls.certresolver=letsencrypt
+      - traefik.http.routers.synapse.service=synapse
+      # HTTP → HTTPS redirect
+      - traefik.http.routers.synapse-http.entrypoints=http
+      - traefik.http.routers.synapse-http.rule=Host(`matrix.vir.group`)
+      - traefik.http.routers.synapse-http.priority=50
+      - traefik.http.routers.synapse-http.middlewares=matrix-redirect
+      - traefik.http.middlewares.matrix-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.matrix-redirect.redirectscheme.permanent=true
+      - traefik.http.services.synapse.loadbalancer.server.port=8008
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8008/health"]
       interval: 15s
@@ -111,12 +131,25 @@ services:
     restart: unless-stopped
     environment:
       REACT_APP_SERVER: ${SYNAPSE_PUBLIC_BASEURL}
-    ports:
+    networks: [matrix-internal, traefik-public]
+    expose:
       - "80"
-    networks: [matrix-internal]
     labels:
-      - "traefik.docker.network=q50663r5jw52lfmbv86vb4i6"
-      - "traefik.http.services.https-0-q50663r5jw52lfmbv86vb4i6-synapse-admin.loadbalancer.server.port=80"
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      - traefik.http.routers.synapse-admin.entrypoints=https
+      - traefik.http.routers.synapse-admin.rule=Host(`admin.matrix.vir.group`)
+      - traefik.http.routers.synapse-admin.priority=50
+      - traefik.http.routers.synapse-admin.tls=true
+      - traefik.http.routers.synapse-admin.tls.certresolver=letsencrypt
+      - traefik.http.routers.synapse-admin.service=synapse-admin
+      - traefik.http.routers.synapse-admin-http.entrypoints=http
+      - traefik.http.routers.synapse-admin-http.rule=Host(`admin.matrix.vir.group`)
+      - traefik.http.routers.synapse-admin-http.priority=50
+      - traefik.http.routers.synapse-admin-http.middlewares=admin-redirect
+      - traefik.http.middlewares.admin-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.admin-redirect.redirectscheme.permanent=true
+      - traefik.http.services.synapse-admin.loadbalancer.server.port=80
 
   # -----------------------------------------------------------
   # Bridge-API — Supabase JWT ↔ Matrix login + user sync
@@ -140,12 +173,25 @@ services:
       BRIDGE_SYNAPSE_SERVER_NAME:  ${SYNAPSE_SERVER_NAME}
       BRIDGE_SYNAPSE_ADMIN_TOKEN:  ${BRIDGE_SYNAPSE_ADMIN_TOKEN}
       BRIDGE_WEBHOOK_SECRET:       ${BRIDGE_WEBHOOK_SECRET:-}
-    ports:
+    networks: [matrix-internal, traefik-public]
+    expose:
       - "8000"
-    networks: [matrix-internal]
     labels:
-      - "traefik.docker.network=q50663r5jw52lfmbv86vb4i6"
-      - "traefik.http.services.https-0-q50663r5jw52lfmbv86vb4i6-bridge-api.loadbalancer.server.port=8000"
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      - traefik.http.routers.bridge-api.entrypoints=https
+      - traefik.http.routers.bridge-api.rule=Host(`bridge.vir.group`)
+      - traefik.http.routers.bridge-api.priority=50
+      - traefik.http.routers.bridge-api.tls=true
+      - traefik.http.routers.bridge-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.bridge-api.service=bridge-api
+      - traefik.http.routers.bridge-api-http.entrypoints=http
+      - traefik.http.routers.bridge-api-http.rule=Host(`bridge.vir.group`)
+      - traefik.http.routers.bridge-api-http.priority=50
+      - traefik.http.routers.bridge-api-http.middlewares=bridge-redirect
+      - traefik.http.middlewares.bridge-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.bridge-redirect.redirectscheme.permanent=true
+      - traefik.http.services.bridge-api.loadbalancer.server.port=8000
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/v1/matrix/health',timeout=3).status==200 else 1)"]
       interval: 15s
@@ -155,9 +201,13 @@ services:
 
   # -----------------------------------------------------------
   # Sygnal — push gateway (FCM v1 + APNs)
-  # Forwards pushes from Synapse to Google / Apple. Privacy-first:
-  # only event_id + room_id reach FCM/APNs (E2EE body stays on server).
-  # Secrets are bind-mounted from /data/matrix-stack-secrets on the host.
+  # Reachable two ways:
+  #   1. https://push.vir.group/_matrix/push/v1/notify   (own host)
+  #   2. https://matrix.vir.group/_matrix/push/v1/notify (path-routed,
+  #      higher priority than synapse so the prefix wins)
+  # Synapse → Sygnal still goes via the matrix-internal network using
+  # the cleartext URL http://sygnal:5000 (set in synapse pushers).
+  # Secrets bind-mounted from /data/matrix-stack-secrets on the host.
   # -----------------------------------------------------------
   sygnal:
     build:
@@ -174,15 +224,34 @@ services:
       SYGNAL_APNS_BUNDLE_ID:           ${SYGNAL_APNS_BUNDLE_ID}
     volumes:
       - /data/matrix-stack-secrets:/secrets:ro
-    ports:
+    networks: [matrix-internal, traefik-public]
+    expose:
       - "5000"
-    networks: [matrix-internal]
     labels:
-      - "traefik.docker.network=q50663r5jw52lfmbv86vb4i6"
-      - "traefik.http.services.https-0-q50663r5jw52lfmbv86vb4i6-sygnal.loadbalancer.server.port=5000"
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      # Dedicated host: push.vir.group
+      - traefik.http.routers.sygnal-host.entrypoints=https
+      - traefik.http.routers.sygnal-host.rule=Host(`push.vir.group`)
+      - traefik.http.routers.sygnal-host.priority=50
+      - traefik.http.routers.sygnal-host.tls=true
+      - traefik.http.routers.sygnal-host.tls.certresolver=letsencrypt
+      - traefik.http.routers.sygnal-host.service=sygnal
+      - traefik.http.routers.sygnal-host-http.entrypoints=http
+      - traefik.http.routers.sygnal-host-http.rule=Host(`push.vir.group`)
+      - traefik.http.routers.sygnal-host-http.priority=50
+      - traefik.http.routers.sygnal-host-http.middlewares=sygnal-redirect
+      # Path under matrix.vir.group (priority > synapse so prefix wins)
+      - traefik.http.routers.sygnal-path.entrypoints=https
+      - traefik.http.routers.sygnal-path.rule=Host(`matrix.vir.group`) && PathPrefix(`/_matrix/push/v1`)
+      - traefik.http.routers.sygnal-path.priority=200
+      - traefik.http.routers.sygnal-path.tls=true
+      - traefik.http.routers.sygnal-path.tls.certresolver=letsencrypt
+      - traefik.http.routers.sygnal-path.service=sygnal
+      - traefik.http.middlewares.sygnal-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.sygnal-redirect.redirectscheme.permanent=true
+      - traefik.http.services.sygnal.loadbalancer.server.port=5000
     healthcheck:
-      # Sygnal exposes only POST endpoints — no plain GET 200 path.
-      # /bin/sh is dash and doesn't have /dev/tcp; use bash explicitly.
       test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/5000"]
       interval: 30s
       timeout: 5s
@@ -191,10 +260,10 @@ services:
 
   # -----------------------------------------------------------
   # LiveKit — SFU for group voice/video calls (Element Call).
-  # Uses host networking — required for WebRTC because docker-proxy
-  # struggles with thousands of UDP ports and conflicts with the
-  # kernel's ephemeral range (32768-60999). With host network the
-  # container binds 7880/tcp + 7881/tcp + 50000-60000/udp directly.
+  # Bridge networking with explicit port-mappings: 7880 (signaling)
+  # is proxied by Traefik via livekit.matrix.vir.group; 7881/tcp +
+  # 7882-7999/udp are media. UDP range stays BELOW Linux's ephemeral
+  # range (32768-60999) to avoid conflicts with outbound sockets.
   # -----------------------------------------------------------
   livekit:
     build:
@@ -206,20 +275,18 @@ services:
       LIVEKIT_API_KEY:    ${LIVEKIT_API_KEY}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
     ports:
-      - "7880"               # WS signaling (Coolify auto-routes via Traefik)
-      - "7881:7881"          # TCP RTC fallback (NAT-restricted clients)
-      - "7882-7999:7882-7999/udp"  # WebRTC media (<32768 → no ephemeral conflict)
-    networks: [matrix-internal]
-    # LiveKit exposes 3 different ports; Traefik can't auto-pick the one to
-    # proxy, so we spell out 7880 (WebSocket signaling) explicitly.
-    # The container has two networks (default + matrix-internal); pin Traefik
-    # to use the project network it shares with the proxy.
-    labels:
-      - "traefik.docker.network=q50663r5jw52lfmbv86vb4i6"
-      - "traefik.http.services.https-0-q50663r5jw52lfmbv86vb4i6-livekit.loadbalancer.server.port=7880"
-      - "traefik.http.services.http-0-q50663r5jw52lfmbv86vb4i6-livekit.loadbalancer.server.port=7880"
+      - "7881:7881"                   # TCP RTC fallback
+      - "7882-7999:7882-7999/udp"     # WebRTC media
+    networks: [matrix-internal, traefik-public]
+    expose:
+      - "7880"
+    # Routing for livekit.matrix.vir.group is provided via Traefik's
+    # file-provider at /home/vir/stacks/traefik/dynamic/livekit.yaml
+    # (Docker provider auto-discovery silently drops the labels on
+    # this container — likely the ports[] block confuses port detection).
     healthcheck:
-      test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/7880"]
+      # LiveKit upstream image has no /bin/bash; use socat-style probe.
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 7880 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -227,10 +294,10 @@ services:
 
   # -----------------------------------------------------------
   # coturn — TURN/STUN for Matrix 1:1 mesh calls (flutter_webrtc).
-  # Host networking is the only sane option: coturn needs to bind
-  # the relay UDP range plus advertise the host's public IP, which
-  # docker-proxy mangles. Ports must be opened in UFW separately:
-  #   3478/udp, 3478/tcp, 49152-49200/udp.
+  # Host networking is mandatory: coturn binds the relay UDP range
+  # plus advertises the host's public IP, which docker-proxy mangles.
+  # UFW must allow:
+  #   3478/udp, 3478/tcp, 5349/udp, 5349/tcp, 49152-49200/udp.
   # Auth: REST API time-limited credentials shared with Synapse via
   # COTURN_STATIC_AUTH_SECRET (== synapse turn_shared_secret).
   # -----------------------------------------------------------
@@ -246,7 +313,9 @@ services:
       COTURN_EXTERNAL_IP:        ${COTURN_EXTERNAL_IP}
       COTURN_STATIC_AUTH_SECRET: ${COTURN_STATIC_AUTH_SECRET}
     healthcheck:
-      test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/3478"]
+      # Alpine sh is busybox/dash — no /dev/tcp pseudo-fs. coturn's
+      # Dockerfile installs bash; use it explicitly.
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/3478"]
       interval: 30s
       timeout: 5s
       retries: 5

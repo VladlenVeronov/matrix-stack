@@ -1,22 +1,21 @@
-# Traefik file-provider override for livekit.matrix.vir.group.
+# Traefik file-provider config for livekit.matrix.vir.group.
 #
-# Coolify's docker-provider auto-discovery silently fails for the LiveKit
-# container — even with the correct labels (router + service + port +
-# tls.certresolver), Traefik's runtime never registers the route, so all
-# external requests return 503 and ACME never triggers.
+# Drop this file at /home/vir/stacks/traefik/dynamic/livekit.yaml on the
+# Hetzner host. Traefik watches that directory (providers.file.watch=true)
+# and picks the route up immediately without restarting anything.
 #
-# Workaround: drop this file at /data/coolify/proxy/dynamic/livekit.yaml
-# on the host. Traefik watches that directory (--providers.file.watch=true),
-# so the route appears immediately without restarting anything.
+# Why a separate file: Traefik docker-provider silently drops route labels
+# from the LiveKit container because it declares both a ports[] block (for
+# the WebRTC TCP/UDP ranges) and an expose[] block (for the signaling
+# port), which confuses its automatic port detection. Explicit file config
+# sidesteps that.
 #
-# The IP `10.0.3.3` is LiveKit's address on the project's default Docker
-# network. Verify after every redeploy with:
+# IMPORTANT: Traefik renders YAML files through its Go template engine, so
+# avoid double-curly-brace syntax in comments — even inside a comment line
+# it will fail to parse.
 #
-#   docker inspect $(docker ps --format '{{.Names}}' | grep '^livekit-q50' | head -1) \
-#     --format '{{(index .NetworkSettings.Networks "q50663r5jw52lfmbv86vb4i6").IPAddress}}'
-#
-# If the IP changes, edit this file accordingly. (TODO: replace with a DNS
-# alias in a follow-up so we don't have to track the IP.)
+# The upstream URL http://livekit:7880 resolves via Docker DNS as both
+# Traefik and LiveKit share the traefik-public network.
 
 http:
   routers:
@@ -26,6 +25,7 @@ http:
       service: livekit-svc
       tls:
         certResolver: letsencrypt
+
     livekit-http:
       entryPoints: [http]
       rule: "Host(`livekit.matrix.vir.group`)"
@@ -42,4 +42,4 @@ http:
     livekit-svc:
       loadBalancer:
         servers:
-          - url: "http://10.0.3.3:7880"
+          - url: "http://livekit:7880"
