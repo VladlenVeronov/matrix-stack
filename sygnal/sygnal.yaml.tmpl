@@ -48,15 +48,13 @@ apps:
     api_version: v1
     project_id: "${SYGNAL_FCM_PROJECT_ID}"
     service_account_file: "${SYGNAL_FCM_SERVICE_ACCOUNT_PATH}"
-    # E2EE-friendly: no message body in payload — only event_id + room_id.
-    # FCM v1 only — content_available/mutable_content are APNs-only fields and
-    # cause Google to reject every message with 400 INVALID_ARGUMENT (verified
-    # 2026-05-07). priority HIGH + ttl 60s push through Doze for VoIP wakeup.
-    fcm_options:
-      default_payload:
-        android:
-          priority: HIGH
-          ttl: "60s"
+    # E2EE-friendly: no body in payload — Sygnal forwards only event_id +
+    # room_id + sender. Keep fcm_options EMPTY: it is the literal FCM v1
+    # message body, so any custom field fails 400 INVALID_ARGUMENT (verified
+    # 2026-05-07: content_available/mutable_content APNs-only, default_payload
+    # not in v1 schema). Sygnal itself injects "priority": "high" already
+    # (gcmpushkin.py L568); nothing to override here.
+    fcm_options: {}
 
   # -----------------------------------------------------------
   # iOS (APNs)
