@@ -48,10 +48,15 @@ apps:
     api_version: v1
     project_id: "${SYGNAL_FCM_PROJECT_ID}"
     service_account_file: "${SYGNAL_FCM_SERVICE_ACCOUNT_PATH}"
-    # E2EE-friendly: no message body in payload — only event_id + room_id
+    # E2EE-friendly: no message body in payload — only event_id + room_id.
+    # FCM v1 only — content_available/mutable_content are APNs-only fields and
+    # cause Google to reject every message with 400 INVALID_ARGUMENT (verified
+    # 2026-05-07). priority HIGH + ttl 60s push through Doze for VoIP wakeup.
     fcm_options:
-      content_available: true
-      mutable_content: true
+      default_payload:
+        android:
+          priority: HIGH
+          ttl: "60s"
 
   # -----------------------------------------------------------
   # iOS (APNs)
