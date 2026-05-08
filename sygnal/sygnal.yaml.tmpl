@@ -67,3 +67,17 @@ apps:
     topic: "${SYGNAL_APNS_BUNDLE_ID}"
     platform: production
     push_type: alert
+
+  # -----------------------------------------------------------
+  # iOS PushKit / VoIP (CallKit wake on m.call.invite while killed)
+  # Same .p8 key — Apple Auth Keys are scoped per-team, NOT per-topic.
+  # Topic MUST end in .voip; push_type=voip routes via PKPushRegistry.
+  # -----------------------------------------------------------
+  ${SYGNAL_APNS_BUNDLE_ID}.voip:
+    type: apns
+    keyfile: "${SYGNAL_APNS_KEY_PATH}"
+    key_id: "${SYGNAL_APNS_KEY_ID}"
+    team_id: "${SYGNAL_APNS_TEAM_ID}"
+    topic: "${SYGNAL_APNS_BUNDLE_ID}.voip"
+    platform: production
+    push_type: voip
